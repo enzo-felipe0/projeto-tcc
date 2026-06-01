@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Benchmark TF.js: CPU vs GPU (WebGPU/WebGL)</title>
+  <style>
+    body { font-family: sans-serif; max-width: 600px; margin: 2rem auto; padding: 0 1rem; }
+    .control-group { margin-bottom: 1rem; padding: 1rem; background: #f5f5f5; border-radius: 8px; }
+    #image-preview { max-width: 100%; max-height: 300px; display: none; margin-top: 1rem; border-radius: 4px; }
+    #results { margin-top: 1rem; padding: 1rem; border: 1px solid #ddd; border-radius: 8px; display: none; }
+    button { padding: 8px 16px; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 4px; }
+    button:disabled { background: #ccc; cursor: not-allowed; }
+  </style>
+
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgpu@4.17.0/dist/tf-backend-webgpu.js"></script>
+  
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.1/dist/mobilenet.min.js"></script>
+</head>
+<body>
+
+  <h1>Benchmark de Inferência</h1>
+  
+  <div class="control-group">
+    <label for="backend-select"><strong>Escolha o Motor de Processamento:</strong></label>
+    <select id="backend-select">
+      <option value="webgl">WebGL (GPU Padrão)</option>
+      <option value="webgpu">WebGPU (GPU Moderna/Experimental)</option>
+      <option value="cpu">CPU (Processador)</option>
+    </select>
+  </div>
+
+  <div class="control-group">
+    <input type="file" id="image-upload" accept="image/png, image/jpeg">
+    <img id="image-preview" alt="Preview da imagem">
+  </div>
+
+  <button id="run-btn" disabled>Carregando modelo...</button>
+
+  <div id="results">
+    <h3>Resultados:</h3>
+    <p><strong>Tempo de Inferência:</strong> <span id="time-ms">-</span> ms</p>
+    <p><strong>Motor utilizado:</strong> <span id="active-backend">-</span></p>
+    <ul id="predictions-list"></ul>
+  </div>
+
+  <script>
+    let model = null;
+    const runBtn = document.getElementById('run-btn');
+    const imageUpload = document.getElementById('image-upload');
+    const imagePreview = document.getElementById('image-preview');
+    const backendSelect = document.getElementById('backend-select');
+
+    //inicializar a aplicação e carregar o modelo
+    async function init() {
+      try {
+        console.log("Inicializando o motor do TensorFlow.js...");
+        
+        await tf.ready(); 
+        
+        console.log("Baixando modelo MobileNet...");
+        model = await mobilenet.load();
+        
+        runBtn.textContent = 'Analisar Imagem';
+        runBtn.disabled = true;
+        console.log("Modelo carregado com sucesso!");
+      } catch (error) {
+        console.error("Erro ao carregar o modelo:", error);
+        runBtn.textContent = 'Erro ao carregar modelo';
+      }
+    }
+
+    //lidar com o upload da imagem no frontend
+    imageUpload.addEventListener('change', (event) => {
+      const file = event.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          imagePreview.src = e.target.result;
+          imagePreview.style.display = 'block';
+          if (model) runBtn.disabled = false;
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    //executar a inferência e medir o tempo
+    runBtn.addEventListener('click', async () => {
+      const selectedBackend = backendSelect.value;
+      const resultsDiv = document.getElementById('results');
+      const predictionsList = document.getElementById('predictions-list');
+      
+      try {
+        runBtn.disabled = true;
+        runBtn.textContent = 'Processando...';
+
+        //configurar o backend selecionado
+        await tf.setBackend(selectedBackend);
+        await tf.ready(); // Aguarda o backend inicializar completamente
+
+        //iniciar o cronômetro
+        const startTime = performance.now();
+
+        //Inferência: Passamos a tag <img> diretamente para o modelo
+        //O MobileNet internamente converte a imagem para um Tensor
+        const predictions = await model.classify(imagePreview);
+
+        //parar o cronômetro
+        const endTime = performance.now();
+        const executionTime = (endTime - startTime).toFixed(2);
+
+        //atualizar a Interface
+        document.getElementById('time-ms').textContent = executionTime;
+        document.getElementById('active-backend').textContent = tf.getBackend();
+        
+        predictionsList.innerHTML = '';
+        predictions.forEach(p => {
+          const li = document.createElement('li');
+          li.textContent = `${p.className} - Probabilidade: ${(p.probability * 100).toFixed(2)}%`;
+          predictionsList.appendChild(li);
+        });
+
+        resultsDiv.style.display = 'block';
+
+        console.log("Enviando métricas para o banco de dados...");
+        fetch('http://localhost:3335/main/dados', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            motor: selectedBackend,
+            tempo: parseFloat(executionTime),
+            resultados: predictions
+          })
+        })
+        .then(response => response.json())
+        .then(data => console.log('Sucesso ao registrar no banco:', data))
+        .catch(err => console.error('Falha ao registrar dados no backend:', err));
+      } catch (error) {
+        console.error("Erro durante a inferência:", error);
+        alert("Erro ao processar imagem. Verifique se o backend " + selectedBackend + " é suportado no seu navegador.");
+      } finally {
+        runBtn.disabled = false;
+        runBtn.textContent = 'Analisar Imagem';
+      }
+    });
+
+    //inicia a aplicação
+    init();
+  </script>
+</body>
+</html>
