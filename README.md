@@ -44,6 +44,7 @@ Localizado no diretório `/frontend`, o frontend consiste em uma aplicação de 
 *   **TensorFlow.js (tfjs):** Framework principal responsável por carregar o modelo e orquestrar os tensores e tensores de computação gráfica.
 *   **TensorFlow.js WebGPU Backend:** Driver de execução experimental que mapeia as operações matemáticas do modelo diretamente na API WebGPU nativa do navegador.
 *   **MobileNet v2:** Modelo de rede neural convolucional (CNN) pré-treinado carregado dinamicamente para classificação de imagens de propósito geral (1000 categorias).
+*   **Coletor de Especificações de Hardware & Software:** Script utilitário em JavaScript que detecta automaticamente detalhes do ambiente cliente (SO, Navegador, Placa de Vídeo/GPU via WebGL, Núcleos de CPU e RAM instalada).
 
 ### Fluxo de Trabalho
 1.  O usuário carrega uma imagem (`png` ou `jpeg`).
@@ -51,7 +52,8 @@ Localizado no diretório `/frontend`, o frontend consiste em uma aplicação de 
 3.  O frontend reconfigura o backend do TF.js em tempo real através de `tf.setBackend()` e aguarda sua inicialização via `tf.ready()`.
 4.  O cronômetro de precisão (`performance.now()`) é acionado antes e após a chamada de `model.classify(image)`.
 5.  Os resultados da classificação e o tempo de processamento são apresentados na tela.
-6.  Os dados do benchmark são transmitidos via `fetch` para o backend para análise posterior.
+6.  As especificações de hardware (CPU, RAM, GPU) e do sistema (SO, Navegador) do usuário são capturadas de forma automática.
+7.  Os dados do benchmark e metadados do ambiente do usuário são transmitidos via `fetch` para o backend para análise posterior.
 
 ---
 
@@ -65,7 +67,7 @@ Localizado no diretório `/backend`, o backend foi estruturado em Node.js utiliz
 *   **CORS:** Habilitado para permitir comunicações seguras entre a origem do frontend e a porta do backend.
 
 ### Estrutura do Banco de Dados
-A tabela `benchmarks` é criada automaticamente ao iniciar o backend e possui a seguinte estrutura:
+A tabela `benchmarks` é criada automaticamente ao iniciar o backend e possui a seguinte estrutura (as colunas de hardware e software são adicionadas dinamicamente via rotina de migração automática ao ligar o servidor, garantindo a compatibilidade retroativa):
 
 | Campo | Tipo | Descrição |
 | :--- | :--- | :--- |
@@ -74,6 +76,11 @@ A tabela `benchmarks` é criada automaticamente ao iniciar o backend e possui a 
 | `tempo` | `REAL` | Tempo de inferência registrado em milissegundos. |
 | `resultados` | `TEXT` | String JSON contendo os maiores índices de predição do modelo MobileNet. |
 | `criado_em` | `DATETIME` | Registro de data/hora da inferência (padrão `CURRENT_TIMESTAMP`). |
+| `so` | `TEXT` | O Sistema Operacional detectado do usuário (ex: `Windows`, `Linux`, `macOS`, etc.). |
+| `navegador` | `TEXT` | O Navegador utilizado (ex: `Chrome`, `Firefox`, `Edge`, etc.). |
+| `ram` | `TEXT` | Capacidade estimada de memória RAM do dispositivo (ex: `8 GB`). |
+| `cpu_cores` | `TEXT` | Número de processadores/threads lógicas do cliente (ex: `16`). |
+| `gpu` | `TEXT` | O modelo e fabricante da placa de vídeo detectado via driver gráfico WebGL (ex: `NVIDIA GeForce RTX 3070`). |
 
 ### Rotas Disponíveis (`/main`)
 *   `POST /main/dados`: Valida e insere um novo registro de benchmark no SQLite.
