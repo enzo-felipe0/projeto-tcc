@@ -11,7 +11,7 @@ const db = new sqlite3.Database(dbPath, (err) => {
   }
 });
 
-//criação da tabela
+//criação da tabela e migrações
 db.serialize(() => {
   db.run(`
     CREATE TABLE IF NOT EXISTS benchmarks (
@@ -22,6 +22,23 @@ db.serialize(() => {
       criado_em DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
+
+  // Adiciona as novas colunas caso elas ainda não existam
+  const novasColunas = [
+    { nome: 'so', tipo: 'TEXT' },
+    { nome: 'navegador', tipo: 'TEXT' },
+    { nome: 'ram', tipo: 'TEXT' },
+    { nome: 'cpu_cores', tipo: 'TEXT' },
+    { nome: 'gpu', tipo: 'TEXT' }
+  ];
+
+  novasColunas.forEach(col => {
+    db.run(`ALTER TABLE benchmarks ADD COLUMN ${col.nome} ${col.tipo}`, (err) => {
+      if (err && !err.message.includes('duplicate column name')) {
+        console.error(`Erro ao adicionar coluna ${col.nome}:`, err.message);
+      }
+    });
+  });
 });
 
 module.exports = db;

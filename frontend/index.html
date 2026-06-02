@@ -52,6 +52,62 @@
     const imagePreview = document.getElementById('image-preview');
     const backendSelect = document.getElementById('backend-select');
 
+    // Função para detectar automaticamente as especificações do sistema e hardware
+    function getSystemInfo() {
+      const userAgent = window.navigator.userAgent;
+      
+      // 1. Detectar Sistema Operacional
+      let so = 'Desconhecido';
+      if (/Windows/i.test(userAgent)) {
+        so = 'Windows';
+      } else if (/Macintosh|Mac OS X/i.test(userAgent)) {
+        so = 'macOS';
+      } else if (/Linux/i.test(userAgent)) {
+        so = 'Linux';
+      } else if (/Android/i.test(userAgent)) {
+        so = 'Android';
+      } else if (/iPhone|iPad|iPod/i.test(userAgent)) {
+        so = 'iOS';
+      }
+
+      // 2. Detectar Navegador
+      let navegador = 'Desconhecido';
+      if (/Firefox/i.test(userAgent)) {
+        navegador = 'Firefox';
+      } else if (/OPR|Opera/i.test(userAgent)) {
+        navegador = 'Opera';
+      } else if (/Edg/i.test(userAgent)) {
+        navegador = 'Edge';
+      } else if (/Chrome/i.test(userAgent)) {
+        navegador = 'Chrome';
+      } else if (/Safari/i.test(userAgent)) {
+        navegador = 'Safari';
+      }
+
+      // 3. Detectar Núcleos de CPU (Logical Cores)
+      const cpu_cores = window.navigator.hardwareConcurrency ? String(window.navigator.hardwareConcurrency) : 'Desconhecido';
+
+      // 4. Detectar Memória RAM (aproximada, suportada em Chromium)
+      const ram = window.navigator.deviceMemory ? `${window.navigator.deviceMemory} GB` : 'Desconhecido';
+
+      // 5. Detectar GPU (Placa de Vídeo) usando WebGL
+      let gpu = 'Desconhecido';
+      try {
+        const canvas = document.createElement('canvas');
+        const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+        if (gl) {
+          const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+          if (debugInfo) {
+            gpu = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
+          }
+        }
+      } catch (e) {
+        console.warn('Erro ao acessar driver gráfico via WebGL:', e);
+      }
+
+      return { so, navegador, ram, cpu_cores, gpu };
+    }
+
     //inicializar a aplicação e carregar o modelo
     async function init() {
       try {
@@ -123,7 +179,9 @@
 
         resultsDiv.style.display = 'block';
 
-        console.log("Enviando métricas para o banco de dados...");
+        const systemInfo = getSystemInfo();
+        console.log("Enviando métricas para o banco de dados...", systemInfo);
+        
         fetch('http://localhost:3335/main/dados', {
           method: 'POST',
           headers: {
@@ -132,7 +190,12 @@
           body: JSON.stringify({
             motor: selectedBackend,
             tempo: parseFloat(executionTime),
-            resultados: predictions
+            resultados: predictions,
+            so: systemInfo.so,
+            navegador: systemInfo.navegador,
+            ram: systemInfo.ram,
+            cpu_cores: systemInfo.cpu_cores,
+            gpu: systemInfo.gpu
           })
         })
         .then(response => response.json())
