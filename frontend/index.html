@@ -364,6 +364,16 @@
     }
 
     /* Loading text anim */
+    .nav-link {
+      display: inline-flex; align-items: center; gap: 0.4rem;
+      margin-top: 1rem; padding: 8px 18px;
+      background: rgba(99,102,241,0.15); border: 1px solid rgba(99,102,241,0.3);
+      color: #818cf8; border-radius: 8px; text-decoration: none;
+      font-size: 0.9rem; font-weight: 500;
+      transition: background 0.2s, box-shadow 0.2s;
+    }
+    .nav-link:hover { background: rgba(99,102,241,0.25); box-shadow: 0 0 12px rgba(99,102,241,0.4); }
+
     .loading-pulse {
       display: inline-block;
       animation: pulse 1.5s infinite ease-in-out;
@@ -385,6 +395,7 @@
     <header>
       <h1>Benchmark de Inferência</h1>
       <p>Análise comparativa cliente-side (CPU vs WebGL vs WebGPU)</p>
+      <a class="nav-link" href="dashboard.html">📊 Ver Dashboard de Resultados →</a>
     </header>
     
     <div class="card">

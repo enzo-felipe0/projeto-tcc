@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard de Resultados — Benchmark TF.js</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --bg2: #1e293b;
+      --card: rgba(30,41,59,0.75);
+      --border: rgba(255,255,255,0.08);
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --primary: #6366f1;
+      --primary-glow: rgba(99,102,241,0.35);
+      --accent: #d946ef;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --cpu: #6366f1;
+      --webgl: #10b981;
+      --webgpu: #d946ef;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Outfit', sans-serif;
+      background: linear-gradient(135deg, var(--bg), var(--bg2));
+      color: var(--text);
+      min-height: 100vh;
+      padding: 2rem 1rem;
+    }
+    .container { max-width: 1200px; margin: 0 auto; }
+
+    /* Header */
+    header { text-align: center; margin-bottom: 2.5rem; }
+    header h1 {
+      font-size: 2.4rem; font-weight: 700;
+      background: linear-gradient(to right, #818cf8, #e879f9);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      margin-bottom: 0.4rem;
+    }
+    header p { color: var(--muted); font-size: 1rem; }
+    .nav-link {
+      display: inline-flex; align-items: center; gap: 0.4rem;
+      margin-top: 1rem; padding: 8px 18px;
+      background: rgba(99,102,241,0.15); border: 1px solid rgba(99,102,241,0.3);
+      color: #818cf8; border-radius: 8px; text-decoration: none;
+      font-size: 0.9rem; font-weight: 500;
+      transition: background 0.2s, box-shadow 0.2s;
+    }
+    .nav-link:hover { background: rgba(99,102,241,0.25); box-shadow: 0 0 12px var(--primary-glow); }
+
+    /* Cards KPI */
+    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px,1fr)); gap: 1rem; margin-bottom: 2rem; }
+    .kpi-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 14px; padding: 1.25rem 1rem; text-align: center;
+      backdrop-filter: blur(10px);
+      transition: border-color 0.2s, transform 0.2s;
+    }
+    .kpi-card:hover { border-color: rgba(99,102,241,0.3); transform: translateY(-2px); }
+    .kpi-label { font-size: 0.75rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.5rem; }
+    .kpi-value { font-size: 2rem; font-weight: 700; }
+    .kpi-value.cpu { color: var(--cpu); }
+    .kpi-value.webgl { color: var(--webgl); }
+    .kpi-value.webgpu { color: var(--webgpu); }
+    .kpi-value.total { color: var(--text); }
+    .kpi-sub { font-size: 0.8rem; color: var(--muted); margin-top: 0.25rem; }
+
+    /* Export button */
+    .toolbar { display: flex; justify-content: flex-end; margin-bottom: 1.5rem; gap: 0.75rem; }
+    .btn-export {
+      padding: 10px 22px; border: none; border-radius: 10px; cursor: pointer;
+      font-family: 'Outfit', sans-serif; font-size: 0.95rem; font-weight: 600;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      color: white; box-shadow: 0 4px 14px var(--primary-glow);
+      transition: all 0.25s; text-decoration: none; display: inline-flex; align-items: center; gap: 0.4rem;
+    }
+    .btn-export:hover { transform: translateY(-2px); box-shadow: 0 6px 20px var(--primary-glow); }
+
+    /* Chart section */
+    .section-title {
+      font-size: 1.1rem; font-weight: 600;
+      border-left: 4px solid var(--primary); padding-left: 0.75rem;
+      margin-bottom: 1.25rem; color: var(--text);
+    }
+    .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem; }
+    .chart-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 16px; padding: 1.5rem;
+      backdrop-filter: blur(10px);
+    }
+    .chart-card.full { grid-column: 1 / -1; }
+    .chart-wrapper { position: relative; height: 280px; }
+    .chart-wrapper.tall { height: 340px; }
+
+    /* Stats table */
+    .table-wrapper { overflow-x: auto; margin-top: 0.75rem; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+    thead th {
+      background: rgba(15,23,42,0.8); color: var(--muted);
+      font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px;
+      padding: 10px 14px; text-align: right; border-bottom: 1px solid var(--border);
+    }
+    thead th:first-child { text-align: left; }
+    tbody tr { border-bottom: 1px solid var(--border); transition: background 0.15s; }
+    tbody tr:hover { background: rgba(99,102,241,0.07); }
+    tbody td { padding: 10px 14px; text-align: right; }
+    tbody td:first-child { text-align: left; font-weight: 600; }
+    .badge {
+      display: inline-block; padding: 3px 10px; border-radius: 20px;
+      font-size: 0.78rem; font-weight: 700; text-transform: uppercase;
+    }
+    .badge.cpu { background: rgba(99,102,241,0.2); color: #818cf8; }
+    .badge.webgl { background: rgba(16,185,129,0.2); color: #34d399; }
+    .badge.webgpu { background: rgba(217,70,239,0.2); color: #e879f9; }
+
+    /* Empty state */
+    .empty { text-align: center; color: var(--muted); padding: 3rem; font-size: 1rem; }
+
+    /* Loading */
+    .loading { text-align: center; color: var(--muted); padding: 4rem; }
+    .spinner {
+      width: 40px; height: 40px; border: 3px solid var(--border);
+      border-top-color: var(--primary); border-radius: 50%;
+      animation: spin 0.8s linear infinite; margin: 0 auto 1rem;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    @media (max-width: 700px) {
+      .charts-grid { grid-template-columns: 1fr; }
+      .chart-card.full { grid-column: 1; }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Dashboard de Resultados</h1>
+    <p>Análise estatística comparativa dos benchmarks coletados</p>
+    <a class="nav-link" href="index.html">← Voltar ao Benchmark</a>
+  </header>
+
+  <div id="app">
+    <div class="loading">
+      <div class="spinner"></div>
+      Carregando dados do backend...
+    </div>
+  </div>
+</div>
+
+<script>
+const API = 'http://localhost:3335/main';
+
+const CORES = {
+  cpu:   { border: '#6366f1', bg: 'rgba(99,102,241,0.7)'  },
+  webgl: { border: '#10b981', bg: 'rgba(16,185,129,0.7)'  },
+  webgpu:{ border: '#d946ef', bg: 'rgba(217,70,239,0.7)'  },
+};
+
+const CHART_DEFAULTS = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: { labels: { color: '#94a3b8', font: { family: 'Outfit', size: 12 } } },
+    tooltip: {
+      backgroundColor: '#1e293b',
+      titleColor: '#f8fafc',
+      bodyColor: '#94a3b8',
+      borderColor: 'rgba(255,255,255,0.1)',
+      borderWidth: 1,
+    }
+  },
+  scales: {
+    x: { ticks: { color: '#94a3b8', font: { family: 'Outfit' } }, grid: { color: 'rgba(255,255,255,0.05)' } },
+    y: { ticks: { color: '#94a3b8', font: { family: 'Outfit' } }, grid: { color: 'rgba(255,255,255,0.05)' } }
+  }
+};
+
+function motorLabel(m) {
+  const map = { cpu: 'CPU', webgl: 'WebGL', webgpu: 'WebGPU' };
+  return map[m] || m.toUpperCase();
+}
+
+function fmt(v, dec = 2) {
+  if (v === null || v === undefined) return '—';
+  return Number(v).toFixed(dec);
+}
+
+async function loadData() {
+  const [stats, dados] = await Promise.all([
+    fetch(`${API}/estatisticas`).then(r => r.json()),
+    fetch(`${API}/dados`).then(r => r.json()),
+  ]);
+  return { stats, dados };
+}
+
+function renderKPIs(stats, dados) {
+  const total = dados.length;
+  const ultima = dados.length ? new Date(dados[0].criado_em).toLocaleDateString('pt-BR') : '—';
+
+  const kpiMotores = stats.por_motor.map(m => `
+    <div class="kpi-card">
+      <div class="kpi-label">Amostras ${motorLabel(m.motor)}</div>
+      <div class="kpi-value ${m.motor}">${m.count}</div>
+      <div class="kpi-sub">Média: ${fmt(m.media_tempo)} ms</div>
+    </div>
+  `).join('');
+
+  return `
+    <div class="kpi-grid">
+      ${kpiMotores}
+      <div class="kpi-card">
+        <div class="kpi-label">Total de Registros</div>
+        <div class="kpi-value total">${total}</div>
+        <div class="kpi-sub">Último: ${ultima}</div>
+      </div>
+    </div>
+  `;
+}
+
+function buildChart1(ctx, porMotor) {
+  const labels = porMotor.map(m => motorLabel(m.motor));
+  return new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Hot Run (Média)',
+          data: porMotor.map(m => m.media_tempo),
+          backgroundColor: porMotor.map(m => CORES[m.motor]?.bg || '#6366f1'),
+          borderColor:     porMotor.map(m => CORES[m.motor]?.border || '#6366f1'),
+          borderWidth: 2, borderRadius: 6,
+        },
+        {
+          label: 'Warm-up (Cold Run)',
+          data: porMotor.map(m => m.media_warmup),
+          backgroundColor: porMotor.map(m => (CORES[m.motor]?.bg || '#6366f1').replace('0.7','0.35')),
+          borderColor:     porMotor.map(m => CORES[m.motor]?.border || '#6366f1'),
+          borderWidth: 2, borderRadius: 6, borderDash: [4,4],
+        },
+        {
+          label: 'Setup do Motor',
+          data: porMotor.map(m => m.media_setup_backend),
+          backgroundColor: 'rgba(245,158,11,0.6)',
+          borderColor: '#f59e0b',
+          borderWidth: 2, borderRadius: 6,
+        },
+      ]
+    },
+    options: {
+      ...CHART_DEFAULTS,
+      plugins: { ...CHART_DEFAULTS.plugins, title: { display: false } },
+      scales: {
+        x: CHART_DEFAULTS.scales.x,
+        y: { ...CHART_DEFAULTS.scales.y, title: { display: true, text: 'Tempo (ms)', color: '#64748b' } }
+      }
+    }
+  });
+}
+
+function buildChart2(ctx, porMotor) {
+  // Barras empilhadas: p25 base + (p50-p25) + (p75-p50)
+  const labels = porMotor.map(m => motorLabel(m.motor));
+  const p25  = porMotor.map(m => m.percentil_25 || 0);
+  const p50  = porMotor.map((m, i) => Math.max(0, (m.percentil_50 || 0) - p25[i]));
+  const p75  = porMotor.map((m, i) => Math.max(0, (m.percentil_75 || 0) - (porMotor[i].percentil_50 || 0)));
+  const p95  = porMotor.map((m, i) => Math.max(0, (m.percentil_95 || 0) - (porMotor[i].percentil_75 || 0)));
+
+  return new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: 'até p25',        data: p25,  backgroundColor: 'rgba(99,102,241,0.25)', borderWidth: 0, borderRadius: 0 },
+        { label: 'p25 → mediana',  data: p50,  backgroundColor: 'rgba(99,102,241,0.55)', borderWidth: 0 },
+        { label: 'mediana → p75',  data: p75,  backgroundColor: 'rgba(217,70,239,0.55)', borderWidth: 0 },
+        { label: 'p75 → p95',      data: p95,  backgroundColor: 'rgba(239,68,68,0.55)',  borderWidth: 0, borderRadius: { topLeft: 6, topRight: 6 } },
+      ]
+    },
+    options: {
+      ...CHART_DEFAULTS,
+      scales: {
+        x: CHART_DEFAULTS.scales.x,
+        y: { ...CHART_DEFAULTS.scales.y, stacked: true, title: { display: true, text: 'Tempo (ms)', color: '#64748b' } },
+        xStack: { stacked: true }
+      },
+      plugins: { ...CHART_DEFAULTS.plugins },
+      interaction: { mode: 'index' }
+    }
+  });
+}
+
+function buildChart3(ctx, porMotor) {
+  const comMem = porMotor.filter(m => m.media_memoria_diferenca !== null);
+  if (!comMem.length) return null;
+  return new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: comMem.map(m => motorLabel(m.motor)),
+      datasets: [{
+        label: 'Consumo Heap (MB)',
+        data: comMem.map(m => m.media_memoria_diferenca),
+        backgroundColor: comMem.map(m => CORES[m.motor]?.bg || '#6366f1'),
+        borderColor:     comMem.map(m => CORES[m.motor]?.border || '#6366f1'),
+        borderWidth: 2, borderRadius: 8,
+      }]
+    },
+    options: {
+      ...CHART_DEFAULTS,
+      scales: {
+        x: CHART_DEFAULTS.scales.x,
+        y: { ...CHART_DEFAULTS.scales.y, title: { display: true, text: 'MB', color: '#64748b' } }
+      }
+    }
+  });
+}
+
+function buildChart4(ctx, porNavegador) {
+  const palette = ['#6366f1','#10b981','#d946ef','#f59e0b','#ef4444','#3b82f6'];
+  return new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: porNavegador.map(n => n.navegador),
+      datasets: [{
+        data: porNavegador.map(n => n.count),
+        backgroundColor: palette.slice(0, porNavegador.length),
+        borderColor: '#1e293b', borderWidth: 3,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'right',
+          labels: { color: '#94a3b8', font: { family: 'Outfit', size: 12 }, padding: 16 }
+        },
+        tooltip: CHART_DEFAULTS.plugins.tooltip,
+      },
+      cutout: '60%',
+    }
+  });
+}
+
+function buildChart5(ctx, porGpu) {
+  if (!porGpu.length) return null;
+  // Agrupar por GPU, pegar a média de tempo de cada GPU (usando média ponderada entre motores)
+  const gpuMap = {};
+  porGpu.forEach(row => {
+    if (!gpuMap[row.gpu]) gpuMap[row.gpu] = { total: 0, count: 0 };
+    gpuMap[row.gpu].total += row.media_tempo * row.count;
+    gpuMap[row.gpu].count += row.count;
+  });
+  const gpus = Object.entries(gpuMap)
+    .map(([gpu, d]) => ({ gpu, media: d.total / d.count, count: d.count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 8);
+
+  return new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: gpus.map(g => g.gpu.length > 40 ? g.gpu.slice(0, 40) + '…' : g.gpu),
+      datasets: [{
+        label: 'Tempo Médio (ms)',
+        data: gpus.map(g => parseFloat(g.media.toFixed(2))),
+        backgroundColor: 'rgba(99,102,241,0.65)',
+        borderColor: '#6366f1',
+        borderWidth: 2, borderRadius: 6,
+      }]
+    },
+    options: {
+      ...CHART_DEFAULTS,
+      indexAxis: 'y',
+      scales: {
+        x: { ...CHART_DEFAULTS.scales.x, title: { display: true, text: 'ms', color: '#64748b' } },
+        y: { ...CHART_DEFAULTS.scales.y, ticks: { font: { size: 10, family: 'Outfit' }, color: '#94a3b8' } }
+      }
+    }
+  });
+}
+
+function renderTable(porMotor) {
+  if (!porMotor.length) return '<div class="empty">Sem dados para exibir.</div>';
+  const rows = porMotor.map(m => `
+    <tr>
+      <td><span class="badge ${m.motor}">${motorLabel(m.motor)}</span></td>
+      <td>${m.count}</td>
+      <td>${fmt(m.media_tempo)}</td>
+      <td>${fmt(m.desvio_padrao)}</td>
+      <td>${fmt(m.percentil_25)}</td>
+      <td>${fmt(m.percentil_50)}</td>
+      <td>${fmt(m.percentil_75)}</td>
+      <td>${fmt(m.percentil_95)}</td>
+      <td>${fmt(m.min_tempo)}</td>
+      <td>${fmt(m.max_tempo)}</td>
+      <td>${fmt(m.media_warmup)}</td>
+      <td>${fmt(m.media_setup_backend)}</td>
+      <td>${fmt(m.media_load_modelo)}</td>
+      <td>${m.media_memoria_diferenca !== null ? fmt(m.media_memoria_diferenca) + ' MB' : '—'}</td>
+    </tr>
+  `).join('');
+
+  return `
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Motor</th><th>Amostras</th><th>Média (ms)</th><th>Desvio Padrão</th>
+            <th>P25</th><th>P50</th><th>P75</th><th>P95</th>
+            <th>Mín</th><th>Máx</th>
+            <th>Warm-up</th><th>Setup Motor</th><th>Carga Modelo</th><th>Δ Heap</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+async function main() {
+  const app = document.getElementById('app');
+  try {
+    const { stats, dados } = await loadData();
+    const { por_motor, por_navegador, por_gpu } = stats;
+
+    if (!por_motor.length) {
+      app.innerHTML = '<div class="empty">Nenhum dado coletado ainda. Execute o benchmark primeiro.</div>';
+      return;
+    }
+
+    app.innerHTML = `
+      ${renderKPIs(stats, dados)}
+
+      <div class="toolbar">
+      <button class="btn-export" id="btn-csv" onclick="downloadCSV()">⬇ Exportar CSV</button>
+      </div>
+
+      <div class="charts-grid">
+        <div class="chart-card full">
+          <div class="section-title">Comparativo de Latência por Motor</div>
+          <div class="chart-wrapper"><canvas id="chart1"></canvas></div>
+        </div>
+
+        <div class="chart-card">
+          <div class="section-title">Distribuição Estatística (p25 / Mediana / p75 / p95)</div>
+          <div class="chart-wrapper"><canvas id="chart2"></canvas></div>
+        </div>
+
+        <div class="chart-card">
+          <div class="section-title">Consumo de Heap JS por Motor</div>
+          <div class="chart-wrapper"><canvas id="chart3"></canvas></div>
+        </div>
+
+        <div class="chart-card">
+          <div class="section-title">Amostras por Navegador</div>
+          <div class="chart-wrapper"><canvas id="chart4"></canvas></div>
+        </div>
+
+        <div class="chart-card">
+          <div class="section-title">Latência Média por GPU (Top 8)</div>
+          <div class="chart-wrapper tall"><canvas id="chart5"></canvas></div>
+        </div>
+
+        <div class="chart-card full">
+          <div class="section-title">Tabela de Estatísticas Detalhadas</div>
+          ${renderTable(por_motor)}
+        </div>
+      </div>
+    `;
+
+    buildChart1(document.getElementById('chart1').getContext('2d'), por_motor);
+    buildChart2(document.getElementById('chart2').getContext('2d'), por_motor);
+
+    const c3 = buildChart3(document.getElementById('chart3').getContext('2d'), por_motor);
+    if (!c3) {
+      document.getElementById('chart3').closest('.chart-card').innerHTML =
+        '<div class="section-title">Consumo de Heap JS por Motor</div><div class="empty">Dados de memória não disponíveis.<br><small>Execute o benchmark no Chrome ou Edge.</small></div>';
+    }
+
+    if (por_navegador.length) buildChart4(document.getElementById('chart4').getContext('2d'), por_navegador);
+    if (por_gpu.length)       buildChart5(document.getElementById('chart5').getContext('2d'), por_gpu);
+
+  } catch (err) {
+    console.error(err);
+    app.innerHTML = `<div class="empty">❌ Não foi possível conectar ao backend.<br><small>Certifique-se de que o servidor está rodando em <strong>http://localhost:3335</strong></small></div>`;
+  }
+}
+
+function downloadCSV() {
+  const btn = document.getElementById('btn-csv');
+  
+  // Feedback visual rápido de carregamento
+  if (btn) { 
+    btn.textContent = '⏳ Baixando...'; 
+    btn.disabled = true;
+    
+    // Retorna o botão ao normal após 2 segundos
+    setTimeout(() => { 
+      btn.textContent = '⬇ Exportar CSV'; 
+      btn.disabled = false; 
+    }, 2000);
+  }
+
+  window.location.href = `${API}/exportar-csv`;
+}
+
+main();
+</script>
+</body>
+</html>
