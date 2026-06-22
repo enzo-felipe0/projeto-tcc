@@ -1,7 +1,22 @@
 const db = require('../config/db');
 
 const salvarDados = (req, res) => {
-  const { motor, tempo, resultados, so, navegador, ram, cpu_cores, gpu } = req.body;
+  const { 
+    motor, 
+    tempo, 
+    resultados, 
+    so, 
+    navegador, 
+    ram, 
+    cpu_cores, 
+    gpu,
+    tempo_load_modelo,
+    tempo_setup_backend,
+    tempo_warmup,
+    memoria_antes,
+    memoria_depois,
+    memoria_diferenca
+  } = req.body;
 
   //validação simples
   if (!motor || tempo === undefined || !resultados) {
@@ -10,8 +25,12 @@ const salvarDados = (req, res) => {
 
   const query = `
     INSERT INTO benchmarks 
-      (motor, tempo, resultados, so, navegador, ram, cpu_cores, gpu) 
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      (
+        motor, tempo, resultados, so, navegador, ram, cpu_cores, gpu,
+        tempo_load_modelo, tempo_setup_backend, tempo_warmup,
+        memoria_antes, memoria_depois, memoria_diferenca
+      ) 
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
   
   const resultadosString = typeof resultados === 'string' ? resultados : JSON.stringify(resultados);
@@ -24,7 +43,13 @@ const salvarDados = (req, res) => {
     navegador || null, 
     ram || null, 
     cpu_cores || null, 
-    gpu || null
+    gpu || null,
+    tempo_load_modelo !== undefined ? tempo_load_modelo : null,
+    tempo_setup_backend !== undefined ? tempo_setup_backend : null,
+    tempo_warmup !== undefined ? tempo_warmup : null,
+    memoria_antes !== undefined ? memoria_antes : null,
+    memoria_depois !== undefined ? memoria_depois : null,
+    memoria_diferenca !== undefined ? memoria_diferenca : null
   ], function (err) {
     if (err) {
       console.error('Erro ao inserir dados no SQLite:', err.message);

@@ -29,7 +29,13 @@ db.serialize(() => {
     { nome: 'navegador', tipo: 'TEXT' },
     { nome: 'ram', tipo: 'TEXT' },
     { nome: 'cpu_cores', tipo: 'TEXT' },
-    { nome: 'gpu', tipo: 'TEXT' }
+    { nome: 'gpu', tipo: 'TEXT' },
+    { nome: 'tempo_load_modelo', tipo: 'REAL' },
+    { nome: 'tempo_setup_backend', tipo: 'REAL' },
+    { nome: 'tempo_warmup', tipo: 'REAL' },
+    { nome: 'memoria_antes', tipo: 'REAL' },
+    { nome: 'memoria_depois', tipo: 'REAL' },
+    { nome: 'memoria_diferenca', tipo: 'REAL' }
   ];
 
   novasColunas.forEach(col => {
